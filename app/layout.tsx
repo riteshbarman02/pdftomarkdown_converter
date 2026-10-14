@@ -11,6 +11,13 @@ export const metadata: Metadata = {
   title: "PDF to Markdown — convert PDFs to clean Markdown",
   description:
     "Upload a PDF and get clean, editable Markdown with headings, lists, links and tables. Optional OCR for scanned pages.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: "/apple-icon.png",
+  },
 };
 
 export const viewport: Viewport = {

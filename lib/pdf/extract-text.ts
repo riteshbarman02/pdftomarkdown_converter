@@ -15,6 +15,12 @@ let pdfjsPromise: Promise<PdfjsModule> | null = null;
 async function loadPdfjs(): Promise<PdfjsModule> {
   if (!pdfjsPromise) {
     pdfjsPromise = (async () => {
+      if (typeof window !== "undefined") {
+        const pdfjs: PdfjsModule = await import("pdfjs-dist");
+        const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
+        pdfjs.GlobalWorkerOptions.workerSrc = `${basePath}/pdf.worker.min.mjs`;
+        return pdfjs;
+      }
       const pdfjs: PdfjsModule = await import("pdfjs-dist/legacy/build/pdf.mjs");
       // Run the PDF.js "worker" in-process; importing it here avoids path resolution issues.
       const worker: PdfjsModule = await import("pdfjs-dist/legacy/build/pdf.worker.mjs");
@@ -194,12 +200,35 @@ class PdfJsDocument implements PdfDocumentHandle {
     }
   }
 
-  async renderPagePng(pageNumber: number, maxDimension = 2600): Promise<Buffer> {
+  async renderPagePng(pageNumber: number, maxDimension = 2600): Promise<Buffer | Uint8Array> {
     const page = await this.doc.getPage(pageNumber);
     try {
       const base = page.getViewport({ scale: 1 });
       const scale = Math.min(2.5, maxDimension / Math.max(base.width, base.height));
       const viewport = page.getViewport({ scale });
+
+      if (typeof window !== "undefined" && typeof document !== "undefined") {
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.ceil(viewport.width);
+        canvas.height = Math.ceil(viewport.height);
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("Could not get 2d canvas context");
+        await page.render({
+          canvasContext: context,
+          viewport,
+          background: "white",
+        }).promise;
+        return new Promise<Uint8Array>((resolve, reject) => {
+          canvas.toBlob((blob) => {
+            if (!blob) return reject(new Error("Canvas toBlob failed"));
+            blob
+              .arrayBuffer()
+              .then((buf) => resolve(new Uint8Array(buf)))
+              .catch(reject);
+          }, "image/png");
+        });
+      }
+
       const factory = this.doc.canvasFactory;
       const target = factory.create(Math.ceil(viewport.width), Math.ceil(viewport.height));
       await page.render({

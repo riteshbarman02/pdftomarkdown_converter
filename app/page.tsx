@@ -9,8 +9,7 @@ import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { getEnv, getLimits } from "@/lib/env";
 
-// Limits come from the environment at request time, not build time.
-export const dynamic = "force-dynamic";
+export const dynamic = "force-static";
 
 export default function Home() {
   const limits = getLimits();

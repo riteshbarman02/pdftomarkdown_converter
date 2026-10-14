@@ -1,6 +1,3 @@
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { AppError } from "@/lib/errors";
 import { getEnv } from "@/lib/env";
 import { collapseSpaces } from "./text-normalize";
@@ -11,25 +8,27 @@ import type { Block, OcrEngine, OcrLine, OcrResult, Segment } from "./types";
 
 /**
  * Tesseract.js-backed OCR. Recognition runs in a worker thread, so it does not
- * block the Node event loop. Language data is fetched by Tesseract.js from its
+ * block the main thread. Language data is fetched by Tesseract.js from its
  * CDN on first use unless OCR_LANG_PATH points at self-hosted `.traineddata.gz` files.
  */
 export class TesseractOcrEngine implements OcrEngine {
   private workers = new Map<string, Promise<any>>();
-  private cachePath: string;
-
-  constructor() {
-    this.cachePath = getEnv().OCR_CACHE_PATH ?? mkdtempSync(join(tmpdir(), "p2m-ocr-"));
-  }
 
   private getWorker(language: string): Promise<any> {
     let w = this.workers.get(language);
     if (!w) {
       w = (async () => {
         const { createWorker } = await import("tesseract.js");
+        if (typeof window !== "undefined") {
+          return createWorker(language);
+        }
+        const { mkdtempSync } = await import("node:fs");
+        const { tmpdir } = await import("node:os");
+        const { join } = await import("node:path");
         const env = getEnv();
+        const cachePath = env.OCR_CACHE_PATH ?? mkdtempSync(join(tmpdir(), "p2m-ocr-"));
         return createWorker(language, 1, {
-          cachePath: this.cachePath,
+          cachePath,
           ...(env.OCR_LANG_PATH ? { langPath: env.OCR_LANG_PATH } : {}),
           errorHandler: () => {},
         });
@@ -40,7 +39,7 @@ export class TesseractOcrEngine implements OcrEngine {
     return w;
   }
 
-  async recognize(png: Buffer, language: string, signal?: AbortSignal): Promise<OcrResult> {
+  async recognize(png: Buffer | Uint8Array, language: string, signal?: AbortSignal): Promise<OcrResult> {
     if (signal?.aborted) throw new AppError("CANCELLED", "The conversion was cancelled.");
     let worker: any;
     try {
@@ -48,12 +47,16 @@ export class TesseractOcrEngine implements OcrEngine {
     } catch (err) {
       throw new AppError(
         "OCR_UNAVAILABLE",
-        "OCR could not be started on this server. The OCR language data may be unreachable.",
+        "OCR could not be started. The OCR language data may be unreachable.",
         { cause: err },
       );
     }
     try {
-      const { data } = await worker.recognize(png, {}, { blocks: true, text: true });
+      const input =
+        typeof Blob !== "undefined" && !(typeof Buffer !== "undefined" && Buffer.isBuffer(png))
+          ? new Blob([png as any], { type: "image/png" })
+          : png;
+      const { data } = await worker.recognize(input, {}, { blocks: true, text: true });
       const lines: OcrLine[] = [];
       for (const block of data.blocks ?? []) {
         for (const para of block.paragraphs ?? []) {

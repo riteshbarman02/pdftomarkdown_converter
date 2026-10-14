@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+    <linearGradient id="fold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e2e8f0"/>
+      <stop offset="100%" stop-color="#cbd5e1"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0f172a" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- App icon squircle base -->
+  <rect width="64" height="64" rx="15" fill="url(#bg)"/>
+  
+  <!-- Subtle inner border -->
+  <rect x="0.75" y="0.75" width="62.5" height="62.5" rx="14.25" fill="none" stroke="#60a5fa" stroke-width="1.5" stroke-opacity="0.4"/>
+
+  <!-- Document paper with shadow -->
+  <g filter="url(#shadow)">
+    <!-- Sheet with top-right dog-ear fold -->
+    <path d="M 16 13 
+             C 16 11.34 17.34 10 19 10 
+             L 37 10 
+             L 48 21 
+             L 48 51 
+             C 48 52.66 46.66 54 45 54 
+             L 19 54 
+             C 17.34 54 16 52.66 16 51 
+             Z" 
+          fill="#ffffff"/>
+    
+    <!-- Dog-ear fold -->
+    <path d="M 37 10 L 37 18.5 C 37 19.88 38.12 21 39.5 21 L 48 21 Z" fill="url(#fold)"/>
+  </g>
+
+  <!-- PDF Accent tag on top left -->
+  <rect x="19" y="14" width="9" height="3" rx="1.5" fill="#ef4444"/>
+
+  <!-- Markdown Mark: M and Arrow down -->
+  <!-- "M" character -->
+  <path d="M 21 44 L 21 28 L 24.5 28 L 27.5 35 L 30.5 28 L 34 28 L 34 44 L 30.5 44 L 30.5 34 L 28 39.5 L 27 39.5 L 24.5 34 L 24.5 44 Z" fill="#1e293b"/>
+
+  <!-- Downward arrow: stem and head -->
+  <!-- Stem -->
+  <path d="M 39.5 28 L 43.5 28 L 43.5 37 L 46 37 L 41.5 44 L 37 37 L 39.5 37 Z" fill="#2563eb"/>
+</svg>

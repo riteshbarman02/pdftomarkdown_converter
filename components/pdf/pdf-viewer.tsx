@@ -32,7 +32,8 @@ export function PdfViewer({ file }: Props) {
     (async () => {
       try {
         const pdfjs: any = await import("pdfjs-dist");
-        pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+        const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
+        pdfjs.GlobalWorkerOptions.workerSrc = `${basePath}/pdf.worker.min.mjs`;
         const data = new Uint8Array(await file.arrayBuffer());
         const loadingTask = pdfjs.getDocument({ data, isEvalSupported: false, enableXfa: false });
         task = loadingTask;

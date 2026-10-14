@@ -20,12 +20,7 @@ import { SelectedFile } from "@/components/upload/selected-file";
 import { ConversionSettingsFields } from "./conversion-settings";
 import { ConversionProgress, type WorkState } from "./conversion-progress";
 import { ResultsWorkspace } from "@/components/editor/results-workspace";
-import {
-  ApiError,
-  cancelJob,
-  uploadForConversion,
-  waitForJob,
-} from "@/lib/client/convert-client";
+import { convertClientSide } from "@/lib/client/convert-client";
 import type { ConversionResult } from "@/lib/pdf/types";
 import {
   conversionSettingsSchema,
@@ -60,7 +55,6 @@ export function Converter({ limits, ocrAvailable, hero, below }: Props) {
   const [showSettings, setShowSettings] = useState(false);
   const [settingsDialog, setSettingsDialog] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
-  const jobIdRef = useRef<string | null>(null);
 
   const form = useForm<ConversionSettings>({
     defaultValues: DEFAULT_SETTINGS,
@@ -74,51 +68,44 @@ export function Converter({ limits, ocrAvailable, hero, below }: Props) {
       if (abortRef.current) return; // prevent duplicate submissions
       const controller = new AbortController();
       abortRef.current = controller;
-      jobIdRef.current = null;
-      setPhase({ kind: "working", state: { stage: "uploading", fraction: 0 } });
+      setPhase({ kind: "working", state: { stage: "validating", progress: null } });
       try {
-        const { id } = await uploadForConversion(target, settings, {
-          signal: controller.signal,
-          onUploadProgress: (fraction) =>
-            setPhase({ kind: "working", state: { stage: "uploading", fraction } }),
-        });
-        jobIdRef.current = id;
-        setPhase({ kind: "working", state: { stage: "queued", progress: null } });
-        const job = await waitForJob(id, {
-          signal: controller.signal,
-          onUpdate: (j) =>
-            setPhase({ kind: "working", state: { stage: j.status, progress: j.progress } }),
-        });
-        if (job.status === "completed" && job.result) {
-          setPhase({ kind: "done", result: job.result, jobKey: job.id });
-          toast.success("Conversion complete");
-        } else if (job.status === "cancelled") {
+        const result = await convertClientSide(
+          target,
+          settings,
+          { maxUploadMb: limits.maxUploadMb, maxPages: limits.maxPages },
+          {
+            signal: controller.signal,
+            onProgress: ({ stage, progress }) => {
+              setPhase({ kind: "working", state: { stage, progress } });
+            },
+          },
+        );
+        const jobKey =
+          typeof crypto !== "undefined" && crypto.randomUUID
+            ? crypto.randomUUID()
+            : String(Date.now());
+        setPhase({ kind: "done", result, jobKey });
+        toast.success("Conversion complete");
+      } catch (e: unknown) {
+        const err = e as { name?: string; code?: string; message?: string } | null;
+        if (err?.name === "AbortError" || err?.code === "CANCELLED") {
           setPhase({ kind: "idle" });
         } else {
-          const err = job.error ?? { code: "INTERNAL", message: "The conversion failed." };
-          setPhase({ kind: "error", ...err });
-          toast.error(err.message);
-        }
-      } catch (e) {
-        if ((e as DOMException)?.name === "AbortError") {
-          setPhase({ kind: "idle" });
-        } else {
-          const err =
-            e instanceof ApiError ? e : new ApiError("INTERNAL", "Something went wrong. Please try again.");
-          setPhase({ kind: "error", code: err.code, message: err.message });
-          toast.error(err.message);
+          const code = err?.code ?? "INTERNAL";
+          const message = err?.message ?? "Something went wrong. Please try again.";
+          setPhase({ kind: "error", code, message });
+          toast.error(message);
         }
       } finally {
         abortRef.current = null;
       }
     },
-    [],
+    [limits.maxPages, limits.maxUploadMb],
   );
 
   const cancel = () => {
     abortRef.current?.abort();
-    const id = jobIdRef.current;
-    if (id) void cancelJob(id);
     toast("Conversion cancelled");
   };
 

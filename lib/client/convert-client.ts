@@ -1,5 +1,54 @@
-import type { ConversionResult } from "@/lib/pdf/types";
+import type { ConversionResult, ProgressEvent } from "@/lib/pdf/types";
 import type { ConversionSettings } from "@/lib/validation/conversion-schema";
+import { convertPdfToMarkdown } from "@/lib/pdf/convert-to-markdown";
+import { PdfJsExtractor } from "@/lib/pdf/extract-text";
+import { TesseractOcrEngine } from "@/lib/pdf/ocr";
+import { validatePdfUpload } from "@/lib/pdf/validate-pdf";
+
+let sharedOcrEngine: TesseractOcrEngine | null = null;
+
+export async function convertClientSide(
+  file: File,
+  settings: ConversionSettings,
+  limits: { maxUploadMb: number; maxPages: number },
+  opts: {
+    signal?: AbortSignal;
+    onProgress?: (event: { stage: JobStatus; progress: { current: number; total: number } | null }) => void;
+  } = {},
+): Promise<ConversionResult> {
+  const { signal, onProgress } = opts;
+
+  onProgress?.({ stage: "validating", progress: null });
+  const arrayBuffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(arrayBuffer);
+
+  validatePdfUpload(file, bytes, { maxBytes: limits.maxUploadMb * 1024 * 1024 });
+
+  if (!sharedOcrEngine && settings.ocrEnabled) {
+    sharedOcrEngine = new TesseractOcrEngine();
+  }
+
+  const result = await convertPdfToMarkdown(bytes, settings, {
+    filename: file.name,
+    signal,
+    limits: { maxPages: limits.maxPages },
+    engines: {
+      extractor: new PdfJsExtractor(),
+      ocr: settings.ocrEnabled ? sharedOcrEngine : null,
+    },
+    onProgress: (p: ProgressEvent) => {
+      onProgress?.({
+        stage: p.stage as JobStatus,
+        progress:
+          p.current !== undefined && p.total !== undefined
+            ? { current: p.current, total: p.total }
+            : null,
+      });
+    },
+  });
+
+  return result;
+}
 
 export type JobStatus =
   | "queued"

@@ -39,7 +39,7 @@ export interface PdfDocumentHandle {
   readonly metadata: PdfMetadata;
   getPage(pageNumber: number): Promise<ExtractedPage>;
   /** Rasterises a page to PNG (used for OCR). */
-  renderPagePng(pageNumber: number, maxDimension?: number): Promise<Buffer>;
+  renderPagePng(pageNumber: number, maxDimension?: number): Promise<Buffer | Uint8Array>;
   destroy(): Promise<void>;
 }
 
@@ -67,7 +67,7 @@ export interface OcrResult {
 
 /** OCR engine. Tesseract.js is the default implementation. */
 export interface OcrEngine {
-  recognize(png: Buffer, language: string, signal?: AbortSignal): Promise<OcrResult>;
+  recognize(png: Buffer | Uint8Array, language: string, signal?: AbortSignal): Promise<OcrResult>;
   terminate(): Promise<void>;
 }
 

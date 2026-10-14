@@ -27,8 +27,12 @@ const MIN_TEXT_CHARS = 25;
 const LOW_OCR_CONFIDENCE = 60;
 
 /** Reads pixel dimensions from a PNG header. */
-function pngWidth(png: Buffer): number {
-  return png.length > 24 ? png.readUInt32BE(16) : 0;
+function pngWidth(png: Buffer | Uint8Array): number {
+  if (png.length > 24) {
+    const view = new DataView(png.buffer, png.byteOffset, png.byteLength);
+    return view.getUint32(16, false);
+  }
+  return 0;
 }
 
 /**
